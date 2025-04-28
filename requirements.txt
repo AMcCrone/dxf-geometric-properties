@@ -1,5 +1,5 @@
 streamlit
-sectionproperties==3.8.0
+sectionproperties.=3.0.0
 cad_to_shapely==0.3.2
 matplotlib
 numpy
