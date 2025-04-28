@@ -70,17 +70,20 @@ def main():
         add_button = st.form_submit_button("Add Component")
         
         if add_button and dxf_file is not None:
-            # Create a more persistent temporary file
-            temp_dir = os.path.join(os.getcwd(), "temp_dxf_files")
-            os.makedirs(temp_dir, exist_ok=True)
+            # Create temporary directory for storing files
+            import tempfile
             
-            # Generate a unique filename
+            # Use an application-level temp directory instead of per-file temp files
+            if 'temp_dir' not in st.session_state:
+                st.session_state.temp_dir = tempfile.mkdtemp()
+            
+            # Generate unique filename
             import uuid
             unique_filename = f"{uuid.uuid4().hex}_{dxf_file.name}"
-            file_path = os.path.join(temp_dir, unique_filename)
+            file_path = os.path.join(st.session_state.temp_dir, unique_filename)
             
-            # Save the file
-            with open(file_path, "wb") as f:
+            # Write file directly
+            with open(file_path, 'wb') as f:
                 f.write(dxf_file.getvalue())
             
             # Add to the session state list
