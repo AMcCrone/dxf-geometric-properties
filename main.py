@@ -70,10 +70,18 @@ def main():
         add_button = st.form_submit_button("Add Component")
         
         if add_button and dxf_file is not None:
-            # Save component file to temporary file
-            with NamedTemporaryFile(suffix=".dxf", delete=False) as tmp_file:
-                tmp_file.write(dxf_file.getvalue())
-                file_path = tmp_file.name
+            # Create a more persistent temporary file
+            temp_dir = os.path.join(os.getcwd(), "temp_dxf_files")
+            os.makedirs(temp_dir, exist_ok=True)
+            
+            # Generate a unique filename
+            import uuid
+            unique_filename = f"{uuid.uuid4().hex}_{dxf_file.name}"
+            file_path = os.path.join(temp_dir, unique_filename)
+            
+            # Save the file
+            with open(file_path, "wb") as f:
+                f.write(dxf_file.getvalue())
             
             # Add to the session state list
             st.session_state.section_components.append({
@@ -220,12 +228,18 @@ def main():
             st.info("Click 'Analyze Section' to view visualizations")
     
     # Cleanup temporary files when app shuts down
-    for comp in st.session_state.section_components:
-        if os.path.exists(comp["path"]):
-            try:
-                os.unlink(comp["path"])
-            except:
-                pass
+    def clean_temp_files():
+        if 'section_components' in st.session_state:
+            for comp in st.session_state.section_components:
+                if os.path.exists(comp["path"]):
+                    try:
+                        os.unlink(comp["path"])
+                    except Exception as e:
+                        print(f"Failed to delete {comp['path']}: {e}")
+    
+    # Register cleanup function to run when session ends
+    import atexit
+    atexit.register(clean_temp_files)
 
 if __name__ == "__main__":
     main()
