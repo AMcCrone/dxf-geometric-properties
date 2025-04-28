@@ -24,32 +24,31 @@ def create_geometry_from_dxf(dxf_filepath, material):
     
     return geometry
 
-def create_compound_geometry(main_dxf_path, main_material, reinforcements=None, mesh_size=20):
+def create_compound_geometry(components, mesh_size=20):
     """
-    Creates a compound geometry from a main DXF file and optional reinforcements
+    Creates a compound geometry from multiple DXF components
     
     Args:
-        main_dxf_path: Path to the main DXF file
-        main_material: Material object for the main section
-        reinforcements: List of tuples (dxf_path, material) for reinforcements
+        components: List of tuples (dxf_path, material) for all section components
         mesh_size: Mesh size for the geometry
         
     Returns:
         CompoundGeometry object with mesh created
     """
-    # Create main geometry with material
-    main_geom = create_geometry_from_dxf(main_dxf_path, main_material)
+    if not components:
+        raise ValueError("No components provided for compound geometry")
     
-    # Initialize compound geometry with main section
-    compound_geom = CompoundGeometry([main_geom])
+    # Initialize geometries list
+    geometries = []
     
-    # Add reinforcements if provided
-    if reinforcements:
-        for reinf_path, reinf_material in reinforcements:
-            # Create reinforcement geometry with material
-            reinf_geom = create_geometry_from_dxf(reinf_path, reinf_material)
-            # Add to compound geometry
-            compound_geom += reinf_geom
+    # Process each component
+    for dxf_path, material in components:
+        # Create geometry with material
+        geometry = create_geometry_from_dxf(dxf_path, material)
+        geometries.append(geometry)
+    
+    # Create compound geometry from all individual geometries
+    compound_geom = CompoundGeometry(geometries)
     
     # Create mesh
     compound_geom.create_mesh(mesh_sizes=mesh_size)
