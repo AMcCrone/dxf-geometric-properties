@@ -20,21 +20,13 @@ def main():
     st.title("DXF Compound Section Analyzer")
     st.markdown("Interactive tool for analyzing compound cross-sections with multiple materials")
     
-    # Sidebar for inputs
+    # Initialize session state for storing section components
+    if 'section_components' not in st.session_state:
+        st.session_state.section_components = []
+    
+    # Sidebar for analysis settings
     with st.sidebar:
-        st.header("Section Configuration")
-        
-        # Main DXF file upload
-        st.subheader("Main Section")
-        main_dxf_file = st.file_uploader("Upload main DXF file", type=["dxf"])
-        
-        # Material selection for main section
-        material_options = list(DEFAULT_MATERIALS.keys())
-        main_material = st.selectbox(
-            "Select material for main section",
-            options=material_options,
-            index=0
-        )
+        st.header("Analysis Settings")
         
         # Mesh size
         mesh_size = st.slider(
@@ -48,120 +40,130 @@ def main():
         
         # Reference material for transformed properties
         st.subheader("Reference Material")
+        material_options = list(DEFAULT_MATERIALS.keys())
         ref_material = st.selectbox(
             "Select reference material for transformed properties",
             options=material_options,
-            index=material_options.index(main_material)
+            index=0  # Default to first material
         )
-    
-    # Main area
-    if main_dxf_file is None:
-        st.info("Please upload a main DXF file to begin analysis")
-        return
-    
-    # Create tabs for adding reinforcements and viewing results
-    tab1, tab2, tab3 = st.tabs(["Add Reinforcements", "Results", "Visualization"])
-    
-    # Save uploaded file to a temporary file
-    with NamedTemporaryFile(suffix=".dxf", delete=False) as tmp_main:
-        tmp_main.write(main_dxf_file.getvalue())
-        main_dxf_path = tmp_main.name
-    
-    # Initialize reinforcements list to store configuration
-    if 'reinforcements' not in st.session_state:
-        st.session_state.reinforcements = []
-
-    # Tab 1: Add Reinforcements
-    with tab1:
-        st.header("Add Reinforcement Sections")
         
-        # Form for adding a new reinforcement
-        with st.form("add_reinforcement"):
-            reinf_dxf_file = st.file_uploader("Upload reinforcement DXF file", type=["dxf"])
-            reinf_material = st.selectbox(
-                "Select material for reinforcement",
+        # Analysis button
+        analyze_button = st.button("Analyze Section", type="primary", use_container_width=True)
+    
+    # Main area - Component Management
+    st.header("Section Components")
+    
+    # Form for adding a new component
+    with st.form("add_component"):
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            dxf_file = st.file_uploader("Upload DXF file", type=["dxf"])
+        
+        with col2:
+            material_options = list(DEFAULT_MATERIALS.keys())
+            material = st.selectbox(
+                "Select material",
                 options=material_options
             )
-            
-            add_button = st.form_submit_button("Add Reinforcement")
-            
-            if add_button and reinf_dxf_file is not None:
-                # Save reinforcement file to temporary file
-                with NamedTemporaryFile(suffix=".dxf", delete=False) as tmp_reinf:
-                    tmp_reinf.write(reinf_dxf_file.getvalue())
-                    reinf_dxf_path = tmp_reinf.name
-                
-                # Add to the session state list
-                st.session_state.reinforcements.append({
-                    "path": reinf_dxf_path,
-                    "material": reinf_material,
-                    "filename": reinf_dxf_file.name
-                })
-                
-                st.success(f"Added reinforcement: {reinf_dxf_file.name} with {reinf_material} material")
         
-        # Display current reinforcements
-        if st.session_state.reinforcements:
-            st.subheader("Current Reinforcements")
-            for i, reinf in enumerate(st.session_state.reinforcements):
-                col1, col2, col3 = st.columns([3, 2, 1])
-                with col1:
-                    st.text(f"{i+1}. {reinf['filename']}")
-                with col2:
-                    st.text(reinf['material'].capitalize())
-                with col3:
-                    if st.button("Remove", key=f"remove_{i}"):
-                        # Remove file
-                        if os.path.exists(reinf['path']):
-                            os.unlink(reinf['path'])
-                        # Remove from list
-                        st.session_state.reinforcements.pop(i)
-                        st.rerun()
-        else:
-            st.info("No reinforcements added yet")
+        add_button = st.form_submit_button("Add Component")
+        
+        if add_button and dxf_file is not None:
+            # Save component file to temporary file
+            with NamedTemporaryFile(suffix=".dxf", delete=False) as tmp_file:
+                tmp_file.write(dxf_file.getvalue())
+                file_path = tmp_file.name
+            
+            # Add to the session state list
+            st.session_state.section_components.append({
+                "path": file_path,
+                "material": material,
+                "filename": dxf_file.name
+            })
+            
+            st.success(f"Added component: {dxf_file.name} with {material} material")
+            st.experimental_rerun()
     
-    # Create compound geometry and calculate properties when user clicks "Analyze"
-    analyze_button = st.sidebar.button("Analyze Section", type="primary", use_container_width=True)
-    
-    if analyze_button:
-        with st.spinner("Analyzing section..."):
-            try:
-                # Create geometry from DXF files
-                compound_geom = create_compound_geometry(
-                    main_dxf_path=main_dxf_path,
-                    main_material=DEFAULT_MATERIALS[main_material],
-                    reinforcements=[
-                        (r["path"], DEFAULT_MATERIALS[r["material"]])
-                        for r in st.session_state.reinforcements
-                    ],
-                    mesh_size=mesh_size
-                )
-                
-                # Calculate section properties
-                section, properties = calculate_section_properties(
-                    compound_geom, 
-                    ref_material=DEFAULT_MATERIALS[ref_material]
-                )
-                
-                # Store results in session state
-                st.session_state.section = section
-                st.session_state.properties = properties
-                
-                # Switch to Results tab
+    # Display current components
+    if st.session_state.section_components:
+        components_table = []
+        for i, comp in enumerate(st.session_state.section_components):
+            components_table.append({
+                "Index": i + 1,
+                "File": comp["filename"],
+                "Material": comp["material"].capitalize()
+            })
+        
+        st.table(components_table)
+        
+        # Option to remove components
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            component_to_remove = st.selectbox(
+                "Select component to remove",
+                options=range(1, len(st.session_state.section_components) + 1),
+                format_func=lambda x: f"{x}. {st.session_state.section_components[x-1]['filename']}"
+            )
+        
+        with col2:
+            if st.button("Remove Selected Component"):
+                # Get index (0-based)
+                idx = component_to_remove - 1
+                # Remove file
+                if os.path.exists(st.session_state.section_components[idx]['path']):
+                    os.unlink(st.session_state.section_components[idx]['path'])
+                # Remove from list
+                st.session_state.section_components.pop(idx)
+                st.success(f"Component removed.")
                 st.experimental_rerun()
-                
-            except Exception as e:
-                st.error(f"Analysis failed: {str(e)}")
-                st.error("""
-                Troubleshooting steps:
-                1. Verify closed, non-intersecting polylines
-                2. Ensure Z=0 for all vertices (FLATTEN in CAD)
-                3. Try smaller mesh size
-                4. Check units are millimeters
-                """)
+    else:
+        st.info("No components added yet. Add at least one DXF component to begin analysis.")
     
-    # Tab 2: Results
-    with tab2:
+    # Create tabs for results and visualization
+    tab1, tab2 = st.tabs(["Results", "Visualization"])
+    
+    # Perform analysis when button is clicked
+    if analyze_button:
+        if len(st.session_state.section_components) == 0:
+            st.error("Please add at least one component before analyzing.")
+        else:
+            with st.spinner("Analyzing compound section..."):
+                try:
+                    # Create geometry from DXF files
+                    components = [
+                        (comp["path"], DEFAULT_MATERIALS[comp["material"]])
+                        for comp in st.session_state.section_components
+                    ]
+                    
+                    # Create compound geometry from all components
+                    compound_geom = create_compound_geometry(components, mesh_size)
+                    
+                    # Calculate section properties
+                    section, properties = calculate_section_properties(
+                        compound_geom, 
+                        ref_material=DEFAULT_MATERIALS[ref_material]
+                    )
+                    
+                    # Store results in session state
+                    st.session_state.section = section
+                    st.session_state.properties = properties
+                    
+                    # Show success message
+                    st.success("Analysis completed successfully!")
+                    
+                except Exception as e:
+                    st.error(f"Analysis failed: {str(e)}")
+                    st.error("""
+                    Troubleshooting steps:
+                    1. Verify closed, non-intersecting polylines
+                    2. Ensure Z=0 for all vertices (FLATTEN in CAD)
+                    3. Try smaller mesh size
+                    4. Check units are millimeters
+                    """)
+    
+    # Tab 1: Results
+    with tab1:
         if 'properties' in st.session_state:
             properties = st.session_state.properties
             
@@ -182,8 +184,8 @@ def main():
         else:
             st.info("Click 'Analyze Section' to view results")
     
-    # Tab 3: Visualization
-    with tab3:
+    # Tab 2: Visualization
+    with tab2:
         if 'section' in st.session_state:
             section = st.session_state.section
             properties = st.session_state.properties
@@ -218,10 +220,10 @@ def main():
             st.info("Click 'Analyze Section' to view visualizations")
     
     # Cleanup temporary files when app shuts down
-    if main_dxf_file is not None:
-        if os.path.exists(main_dxf_path):
+    for comp in st.session_state.section_components:
+        if os.path.exists(comp["path"]):
             try:
-                os.unlink(main_dxf_path)
+                os.unlink(comp["path"])
             except:
                 pass
 
