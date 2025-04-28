@@ -83,7 +83,7 @@ def main():
             })
             
             st.success(f"Added component: {dxf_file.name} with {material} material")
-            st.experimental_rerun()
+            st.rerun()
     
     # Display current components
     if st.session_state.section_components:
@@ -116,7 +116,7 @@ def main():
                 # Remove from list
                 st.session_state.section_components.pop(idx)
                 st.success(f"Component removed.")
-                st.experimental_rerun()
+                st.rerun()
     else:
         st.info("No components added yet. Add at least one DXF component to begin analysis.")
     
