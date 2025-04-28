@@ -5,21 +5,12 @@ import os
 def create_geometry_from_dxf(dxf_filepath, material):
     """
     Creates a geometry object from a DXF file with assigned material
-    
-    Args:
-        dxf_filepath: Path to the DXF file
-        material: Material object to assign to the geometry
-        
-    Returns:
-        Geometry object with assigned material
     """
     if not os.path.exists(dxf_filepath):
         raise FileNotFoundError(f"DXF file not found: {dxf_filepath}")
     
-    # Create geometry from DXF
+    # Create geometry directly from DXF without intermediate steps
     geometry = Geometry.from_dxf(dxf_filepath=dxf_filepath)
-    
-    # Assign material
     geometry.material = material
     
     return geometry
@@ -27,30 +18,20 @@ def create_geometry_from_dxf(dxf_filepath, material):
 def create_compound_geometry(components, mesh_size=20):
     """
     Creates a compound geometry from multiple DXF components
-    
-    Args:
-        components: List of tuples (dxf_path, material) for all section components
-        mesh_size: Mesh size for the geometry
-        
-    Returns:
-        CompoundGeometry object with mesh created
     """
     if not components:
         raise ValueError("No components provided for compound geometry")
     
-    # Initialize geometries list
+    # Initialize with an empty list
     geometries = []
     
-    # Process each component
+    # Create geometry for each component
     for dxf_path, material in components:
-        # Create geometry with material
         geometry = create_geometry_from_dxf(dxf_path, material)
         geometries.append(geometry)
     
-    # Create compound geometry from all individual geometries
+    # Create compound geometry
     compound_geom = CompoundGeometry(geometries)
-    
-    # Create mesh
     compound_geom.create_mesh(mesh_sizes=mesh_size)
     
     return compound_geom
