@@ -1,8 +1,8 @@
 from sectionproperties.pre import Material
 from sectionproperties.pre.geometry import Geometry, CompoundGeometry
 import os
+import cad_to_shapely
 from shapely.geometry import Polygon
-from cad_to_shapely import DXFImporter
 
 def create_geometry_from_dxf(dxf_filepath, material):
     """
@@ -18,28 +18,27 @@ def create_geometry_from_dxf(dxf_filepath, material):
     if not os.path.exists(dxf_filepath):
         raise FileNotFoundError(f"DXF file not found: {dxf_filepath}")
     
-    # Use cad_to_shapely to import DXF
-    importer = DXFImporter(dxf_filepath)
-    polygons = importer.process()
+    # Use cad_to_shapely to convert DXF to shapely geometries
+    geometries = cad_to_shapely.dxf_to_shapely(dxf_filepath)
     
     # Convert each shapely polygon to a sectionproperties geometry
-    geometries = []
-    for poly in polygons:
-        if isinstance(poly, Polygon) and poly.is_valid:
+    section_geometries = []
+    for geom in geometries:
+        if isinstance(geom, Polygon) and geom.is_valid:
             # Extract coordinates from the Polygon
-            exterior_coords = list(poly.exterior.coords)
+            exterior_coords = list(geom.exterior.coords)
             
             # Create a geometry from the polygon coordinates
-            geom = Geometry(points=exterior_coords[:-1])  # Exclude last point (duplicate of first)
-            geom.material = material
-            geometries.append(geom)
+            section_geom = Geometry(points=exterior_coords[:-1])  # Exclude last point (duplicate of first)
+            section_geom.material = material
+            section_geometries.append(section_geom)
     
     # If we have multiple polygons, create a compound geometry
-    if len(geometries) > 1:
-        compound_geom = CompoundGeometry(geometries)
+    if len(section_geometries) > 1:
+        compound_geom = CompoundGeometry(section_geometries)
         return compound_geom
-    elif len(geometries) == 1:
-        return geometries[0]
+    elif len(section_geometries) == 1:
+        return section_geometries[0]
     else:
         raise ValueError(f"No valid polygons found in DXF file: {dxf_filepath}")
 
