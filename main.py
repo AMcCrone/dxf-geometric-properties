@@ -2,7 +2,9 @@
 import streamlit as st
 import os
 import matplotlib.pyplot as plt
-from tempfile import NamedTemporaryFile
+import tempfile
+import uuid
+import traceback
 
 # Import from our project modules
 from materials.defaults import DEFAULT_MATERIALS
@@ -21,9 +23,17 @@ def main():
     st.title("DXF Compound Section Analyzer")
     st.markdown("Interactive tool for analyzing compound cross-sections with multiple materials")
     
+    # Display version information
+    st.sidebar.markdown("### Version Information")
+    st.sidebar.info("Using sectionproperties v3.9.0 and cad_to_shapely v0.3.2")
+    
     # Initialize session state for storing section components
     if 'section_components' not in st.session_state:
         st.session_state.section_components = []
+    
+    # Create temporary directory if it doesn't exist yet
+    if 'temp_dir' not in st.session_state:
+        st.session_state.temp_dir = tempfile.mkdtemp(prefix="dxf_analyzer_")
     
     # Sidebar for analysis settings
     with st.sidebar:
@@ -92,13 +102,7 @@ def main():
         add_button = st.form_submit_button("Add Component")
         
         if add_button and dxf_file is not None:
-            # Create temporary directory if it doesn't exist yet
-            if 'temp_dir' not in st.session_state:
-                import tempfile
-                st.session_state.temp_dir = tempfile.mkdtemp(prefix="dxf_analyzer_")
-            
             # Generate a unique filename
-            import uuid
             unique_filename = f"{uuid.uuid4().hex}_{dxf_file.name}"
             file_path = os.path.join(st.session_state.temp_dir, unique_filename)
             
@@ -168,7 +172,10 @@ def main():
                     ]
                     
                     # Create compound geometry from all components
-                    compound_geom = create_compound_geometry(components, mesh_size=mesh_size)
+                    compound_geom = create_compound_geometry(
+                        components, 
+                        mesh_size=[mesh_size]  # Pass as list as required by API
+                    )
                     
                     # Calculate section properties
                     section, properties = calculate_section_properties(
@@ -183,15 +190,27 @@ def main():
                     # Show success message
                     st.success("Analysis completed successfully!")
                     
+                except ImportError as e:
+                    st.error(f"Import error: {str(e)}")
+                    st.error("""
+                    Please make sure you have the required packages installed:
+                    ```
+                    pip install sectionproperties[dxf]==3.9.0 cad_to_shapely==0.3.2
+                    ```
+                    """)
                 except Exception as e:
                     st.error(f"Analysis failed: {str(e)}")
+                    # Show more detailed error for debugging
+                    with st.expander("Detailed Error Information"):
+                        st.code(traceback.format_exc())
+                    
                     st.error("""
                     Troubleshooting steps:
-                    1. Verify closed, non-intersecting polylines
+                    1. Verify closed, non-intersecting polylines in your DXF
                     2. Ensure Z=0 for all vertices (FLATTEN in CAD)
                     3. Try smaller mesh size
                     4. Check units are millimeters
-                    5. Verify that 'cad_to_shapely' is installed; try 'pip install sectionproperties[dxf]'
+                    5. Verify proper installation of dependencies
                     """)
     
     # Tab 1: Results
@@ -243,14 +262,20 @@ def main():
                 st.text("This may take a moment to compute...")
                 if st.button("Generate Full Results"):
                     try:
-                        # Create a matplotlib figure for results
-                        fig = plt.figure(figsize=(12, 8))
-                        ax = fig.add_subplot(111)
-                        section.plot_centroids(ax=ax)
+                        # Create matplotlib figure for results
+                        fig, ax = plt.subplots(figsize=(12, 8))
                         section.plot_mesh(ax=ax, materials=True)
+                        section.plot_centroids(ax=ax)
+                        ax.set_title("Cross-Section Analysis")
+                        ax.set_xlabel('x')
+                        ax.set_ylabel('y')
+                        ax.grid(True)
+                        ax.set_aspect('equal')
                         st.pyplot(fig)
                     except Exception as e:
                         st.error(f"Could not generate advanced visualization: {str(e)}")
+                        with st.expander("Detailed Error Information"):
+                            st.code(traceback.format_exc())
             
         else:
             st.info("Click 'Analyze Section' to view visualizations")
