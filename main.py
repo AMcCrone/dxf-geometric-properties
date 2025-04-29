@@ -1,4 +1,4 @@
-#main.py
+# main.py
 import streamlit as st
 import os
 import matplotlib.pyplot as plt
@@ -38,6 +38,27 @@ def main():
             step=0.1,
             help="Smaller values create a finer mesh but increase computation time"
         )
+        
+        # Advanced DXF import settings
+        with st.expander("Advanced DXF Import Settings"):
+            spline_delta = st.slider(
+                "Spline delta",
+                min_value=0.001,
+                max_value=0.1,
+                value=0.01,
+                step=0.001,
+                format="%.3f",
+                help="Affects spline sampling rate (smaller = more accurate but slower)"
+            )
+            
+            degrees_per_segment = st.slider(
+                "Degrees per segment",
+                min_value=1.0,
+                max_value=45.0,
+                value=10.0,
+                step=1.0,
+                help="Number of degrees discretized as a single line segment"
+            )
         
         # Reference material for transformed properties
         st.subheader("Reference Material")
@@ -94,9 +115,6 @@ def main():
             
             st.success(f"Added component: {dxf_file.name} with {material} material")
             st.rerun()
-            
-            st.success(f"Added component: {dxf_file.name} with {material} material")
-            st.rerun()
     
     # Display current components
     if st.session_state.section_components:
@@ -150,7 +168,7 @@ def main():
                     ]
                     
                     # Create compound geometry from all components
-                    compound_geom = create_compound_geometry(components, mesh_size)
+                    compound_geom = create_compound_geometry(components, mesh_size=mesh_size)
                     
                     # Calculate section properties
                     section, properties = calculate_section_properties(
@@ -173,6 +191,7 @@ def main():
                     2. Ensure Z=0 for all vertices (FLATTEN in CAD)
                     3. Try smaller mesh size
                     4. Check units are millimeters
+                    5. Verify that 'cad_to_shapely' is installed; try 'pip install sectionproperties[dxf]'
                     """)
     
     # Tab 1: Results
@@ -223,11 +242,15 @@ def main():
             with st.expander("Advanced Analysis Results"):
                 st.text("This may take a moment to compute...")
                 if st.button("Generate Full Results"):
-                    # Create display and convert to an image
-                    section.display_results()
-                    # Note: Streamlit doesn't support the interactive display
-                    # that sectionproperties uses, so we might need to modify this
-                    st.warning("This functionality needs to be modified for Streamlit")
+                    try:
+                        # Create a matplotlib figure for results
+                        fig = plt.figure(figsize=(12, 8))
+                        ax = fig.add_subplot(111)
+                        section.plot_centroids(ax=ax)
+                        section.plot_mesh(ax=ax, materials=True)
+                        st.pyplot(fig)
+                    except Exception as e:
+                        st.error(f"Could not generate advanced visualization: {str(e)}")
             
         else:
             st.info("Click 'Analyze Section' to view visualizations")
