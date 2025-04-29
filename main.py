@@ -13,6 +13,102 @@ from analysis.properties import calculate_section_properties
 from utils.plotting import plot_mesh, plot_centroids_with_info
 from utils.formatting import format_properties_output
 
+import sys
+import math
+import numpy as np
+import logging
+from typing import List
+
+# Try to patch the module directly
+try:
+    import cad_to_shapely.utils as utils
+    
+    # Helper functions needed by arc_points_from_bulge
+    def distance(p1, p2):
+        """Calculate Euclidean distance between two points"""
+        return math.sqrt((p2[0]-p1[0])**2 + (p2[1]-p1[1])**2)
+
+    def arc_points(start_angle, end_angle, r, center, degrees_per_segment):
+        """Generate points along an arc"""
+        # Make sure angles increase
+        if end_angle < start_angle:
+            end_angle += 2*math.pi
+        
+        # Calculate number of segments
+        angle_range = abs(end_angle - start_angle)
+        num_segments = max(1, int(math.degrees(angle_range) / degrees_per_segment))
+        
+        # Generate points
+        points = []
+        for i in range(num_segments + 1):
+            angle = start_angle + (end_angle - start_angle) * i / num_segments
+            x = center[0] + r * math.cos(angle)
+            y = center[1] + r * math.sin(angle)
+            points.append([x, y])
+        
+        return points
+    
+    # The exact function from GitHub repo
+    def arc_points_from_bulge(p1: List[float], p2: List[float], b: float, degrees_per_segment: float):
+        """
+        http://darrenirvine.blogspot.com/2015/08/polylines-radius-bulge-turnaround.html
+        Args:
+            p1 (List[float]): First point of the arc
+            p2 (List[float]): Second point of the arc
+            b (float): bulge of the arc
+            degrees_per_segment (float): Resolution of the arc
+        Returns:
+            [type]: points on arc
+        """
+        theta = 4 * math.atan(b)
+        u = distance(p1, p2)
+        r = u * ((b**2) + 1) / (4 * b)
+        try:
+            a = math.sqrt(r**2 - (u*u/4))
+        except ValueError:
+            a = 0
+        
+        dx = (p2[0] - p1[0]) / u
+        dy = (p2[1] - p1[1]) / u
+        A = np.array(p1)
+        B = np.array(p2)
+        # normal direction
+        N = np.array([dy, -dx])
+        # if bulge is negative arc is clockwise
+        # otherwise counter-clockwise
+        s = b / abs(b)  # sigma = signum(b)
+        
+        # centre, as a np.array 2d point
+        if abs(theta) <= math.pi:
+            C = ((A + B) / 2) - s * a * N
+        else:
+            C = ((A + B) / 2) + s * a * N
+        
+        logging.debug(f'radius {r:.1f} : distance {u:.1f} : centre {C[0]:.1f},{C[1]:.1f}')
+        start_angle = math.atan2(p1[1] - C[1], p1[0] - C[0])
+        if b < 0:
+            start_angle += math.pi
+        
+        end_angle = start_angle + theta
+        return arc_points(start_angle, end_angle, r, C, degrees_per_segment)
+    
+    # Add these functions to the utils module if they don't exist
+    if not hasattr(utils, 'distance'):
+        utils.distance = distance
+    
+    if not hasattr(utils, 'arc_points'):
+        utils.arc_points = arc_points
+    
+    if not hasattr(utils, 'arc_points_from_bulge'):
+        utils.arc_points_from_bulge = arc_points_from_bulge
+        print("Successfully patched utils module with arc_points_from_bulge function")
+        
+except ImportError:
+    print("Could not import cad_to_shapely module")
+except Exception as e:
+    print(f"Error patching module: {str(e)}")
+
+
 def main():
     st.set_page_config(
         page_title="DXF Compound Section Analyzer",
