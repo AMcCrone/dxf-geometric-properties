@@ -3,3 +3,4 @@ sectionproperties==3.9.0
 cad_to_shapely==0.3.2
 matplotlib
 numpy
+ezdxf
